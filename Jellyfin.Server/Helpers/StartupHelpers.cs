@@ -118,7 +118,7 @@ public static class StartupHelpers
         var webDir = options.WebDir ?? Environment.GetEnvironmentVariable("JELLYFIN_WEB_DIR");
         if (webDir is null)
         {
-            webDir = Path.Join(AppContext.BaseDirectory, "jellyfin-web");
+            webDir = Path.Join(AppContext.BaseDirectory, "padzanij-web");
         }
 
         var logDir = options.LogDir ?? Environment.GetEnvironmentVariable("JELLYFIN_LOG_DIR");
