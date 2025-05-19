@@ -144,6 +144,17 @@ namespace Emby.Server.Implementations
             IConfiguration startupConfig)
         {
             ApplicationPaths = applicationPaths;
+
+			// در داخل ctor:
+			var entryExePath = Process.GetCurrentProcess().MainModule.FileName;
+			// یا اگر ترجیح می‌دهید AppContext.BaseDirectory:
+			// var exeName = $"{Assembly.GetEntryAssembly()?.GetName().Name}.exe";
+			// var entryExePath = Path.Combine(AppContext.BaseDirectory, exeName);
+
+			ApplicationProductName = FileVersionInfo
+				.GetVersionInfo(entryExePath)
+				.ProductName;
+
             LoggerFactory = loggerFactory;
             _startupOptions = options;
             _startupConfig = startupConfig;
@@ -249,7 +260,9 @@ namespace Emby.Server.Implementations
         /// Gets the current application name.
         /// </summary>
         /// <value>The application name.</value>
-        public string ApplicationProductName { get; } = FileVersionInfo.GetVersionInfo(Assembly.GetEntryAssembly().Location).ProductName;
+        public string ApplicationProductName { get; private set; }
+
+
 
         public string SystemId => _deviceId.Value;
 

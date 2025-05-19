@@ -141,7 +141,8 @@ namespace Emby.Server.Implementations.Plugins
                     }
                     catch (FileLoadException ex)
                     {
-                        _logger.LogError(ex, "Failed to load assembly {Path}. Disabling plugin", file);
+                        _logger.LogError(ex, "Failed to load assembly from {Path}. Disabling plugin", file);
+
                         ChangePluginState(plugin, PluginStatus.Malfunctioned);
                         loadedAll = false;
                         break;
@@ -162,31 +163,38 @@ namespace Emby.Server.Implementations.Plugins
                     continue;
                 }
 
-                foreach (var assembly in assemblies)
-                {
-                    try
-                    {
-                        // Load all required types to verify that the plugin will load
-                        assembly.GetTypes();
-                    }
-                    catch (SystemException ex) when (ex is TypeLoadException or ReflectionTypeLoadException) // Undocumented exception
-                    {
-                        _logger.LogError(ex, "Failed to load assembly {Path}. This error occurs when a plugin references an incompatible version of one of the shared libraries. Disabling plugin", assembly.Location);
-                        ChangePluginState(plugin, PluginStatus.NotSupported);
-                        break;
-                    }
-#pragma warning disable CA1031 // Do not catch general exception types
-                    catch (Exception ex)
-#pragma warning restore CA1031 // Do not catch general exception types
-                    {
-                        _logger.LogError(ex, "Failed to load assembly {Path}. Unknown exception was thrown. Disabling plugin", assembly.Location);
-                        ChangePluginState(plugin, PluginStatus.Malfunctioned);
-                        break;
-                    }
+				foreach (var assembly in assemblies)
+				{
+					try
+					{
+						assembly.GetTypes();
+					}
+					catch (SystemException ex) when (ex is TypeLoadException or ReflectionTypeLoadException)
+					{
+						_logger.LogError(
+							ex,
+							"Failed to load assembly from {Path}. This error occurs when a plugin references an incompatible version of one of the shared libraries. Disabling plugin",
+							AppContext.BaseDirectory);
+						ChangePluginState(plugin, PluginStatus.NotSupported);
+						break;
+					}
+					catch (Exception ex)
+					{
+						_logger.LogError(
+							ex,
+							"Failed to load assembly from {Path}. Unknown exception was thrown. Disabling plugin",
+							AppContext.BaseDirectory);
+						ChangePluginState(plugin, PluginStatus.Malfunctioned);
+						break;
+					}
 
-                    _logger.LogInformation("Loaded assembly {Assembly} from {Path}", assembly.FullName, assembly.Location);
-                    yield return assembly;
-                }
+					_logger.LogInformation(
+						"Loaded assembly {Assembly} from {Path}",
+						assembly.FullName,
+						AppContext.BaseDirectory);
+
+					yield return assembly;
+				}
             }
         }
 
@@ -345,20 +353,24 @@ namespace Emby.Server.Implementations.Plugins
         /// Disable the plugin.
         /// </summary>
         /// <param name="assembly">The <see cref="Assembly"/> of the plug to disable.</param>
-        public void FailPlugin(Assembly assembly)
-        {
-            // Only save if disabled.
-            ArgumentNullException.ThrowIfNull(assembly);
+		public void FailPlugin(Assembly assembly)
+		{
+			var dllName = $"{assembly.GetName().Name}.dll";
+			var plugin = _plugins.FirstOrDefault(p =>
+				p.DllFiles.Any(d =>
+					Path.GetFileName(d)
+						.Equals(dllName, StringComparison.OrdinalIgnoreCase)));
 
-            var plugin = _plugins.FirstOrDefault(p => p.DllFiles.Contains(assembly.Location));
-            if (plugin is null)
-            {
-                // A plugin's assembly didn't cause this issue, so ignore it.
-                return;
-            }
+			if (plugin is null)
+			{
+				// A plugin's assembly didn't cause this issue, so ignore it.
+				return;
+			}
 
-            ChangePluginState(plugin, PluginStatus.Malfunctioned);
-        }
+			// اگر پیدا شد، آن را به حالت malfunctioned ببرید
+			ChangePluginState(plugin, PluginStatus.Malfunctioned);
+		}
+
 
         /// <inheritdoc/>
         public bool SaveManifest(PluginManifest manifest, string path)
@@ -527,11 +539,17 @@ namespace Emby.Server.Implementations.Plugins
         /// </summary>
         /// <param name="assembly">The <see cref="Assembly"/> being sought.</param>
         /// <returns>The matching record, or null if not found.</returns>
-        private LocalPlugin? GetPluginByAssembly(Assembly assembly)
-        {
-            // Find which plugin it is by the path.
-            return _plugins.FirstOrDefault(p => p.DllFiles.Contains(assembly.Location, StringComparer.Ordinal));
-        }
+		private LocalPlugin? GetPluginByAssembly(Assembly assembly)
+		{
+			// اسم اسمبلی + ".dll"
+			var dllName = $"{assembly.GetName().Name}.dll";
+
+			// پیدا کردن پلاگینی که لیست DllFiles آن شامل فایلی با این اسم باشد
+			return _plugins.FirstOrDefault(p =>
+				p.DllFiles.Any(d => 
+					Path.GetFileName(d)
+					.Equals(dllName, StringComparison.OrdinalIgnoreCase)));
+		}
 
         /// <summary>
         /// Creates the instance safe.

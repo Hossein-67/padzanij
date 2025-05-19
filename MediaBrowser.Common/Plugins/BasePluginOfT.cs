@@ -43,9 +43,13 @@ namespace MediaBrowser.Common.Plugins
             ApplicationPaths = applicationPaths;
             XmlSerializer = xmlSerializer;
 
-            var assembly = GetType().Assembly;
-            var assemblyName = assembly.GetName();
-            var assemblyFilePath = assembly.Location;
+			var assembly = GetType().Assembly;
+			var assemblyName = assembly.GetName();
+			var baseDir = AppContext.BaseDirectory;
+			var moduleFileName = $"{assemblyName.Name}.dll";
+			var assemblyFilePath = Path.Combine(baseDir, moduleFileName);
+
+
 
             var dataFolderPath = Path.Combine(ApplicationPaths.PluginsPath, Path.GetFileNameWithoutExtension(assemblyFilePath));
             if (Version is not null && !Directory.Exists(dataFolderPath))
